@@ -406,33 +406,19 @@ draw.quad.venn(length(s1),length(s2),length(s3),length(s4),length(intersect(s1,s
 dev.off()
 #####Overlap significance#####
 #https://www.r-bloggers.com/hypothesis-testing-on-normally-distributed-data-in-r/
-t.test.twoTails <- function(data, mu0, alpha){
-  t.stat <- abs((mean(data) - mu0)) / (sqrt(var(data) / length(data)))
-  dof <- length(data) - 1
-  t.critical <- qt(1-alpha/2, df= dof) #Es alpha 0.05 -> -1.9599 (df=Inf)
-  p.value <- 2*(1-pt(t.stat, df= dof))
-  if(t.stat >= t.critical)
-  {
-    h<-"Reject"
-  }
-  else
-  {
-    h<-"Accept"
-  }
-  list("H0"=h,"T_statistic"=t.stat,
-       "T_critical_values"=c(-t.critical,t.critical),
-       "p_value"=p.value)
-}
-n.test.twoTails <- function(data, mu0, alpha){
-  z<-abs(mean(data)-mu0)/sd(data)
+n.test.oneTails <- function(data, mu0, alpha){
+  z<-(mean(data)-mu0)/sd(data)
   n.critical <- qnorm(1-alpha/2) #Es alpha 0.05 -> -1.9599 (df=Inf)
-  p.value <- pnorm(z,mean(data),sd(data))
-  if(z >= n.critical)
-  {
+  if(z > -n.critical){
+    p.value<-1-pnorm(z)
+  }
+  else{
+    p.value<-pnorm(z)
+  }
+  if(abs(z) >= n.critical){
     h<-"Reject"
   }
-  else
-  {
+  else{
     h<-"Accept"
   }
   list("H0"=h,"n_critical_values"=c(-n.critical,n.critical),
@@ -449,7 +435,7 @@ for(i in 1:1000){
 }
 hist(null,xlim=c(min(null)-350,max(null)+350));abline(v=obs,col="red",lwd=2)
 options(scipen = -999999)
-n.test.twoTails(null,obs,1e-5)
+n.test.oneTails(null,obs,1e-5)
 s1<-topEnrichments$pk$path_id;lens1<-length(s1)
 s2<-topEnrichments$sz$path_id;lens2<-length(s2)
 obs<-length(intersect(s1,s2))
@@ -460,7 +446,7 @@ for(i in 1:1000){
   null<-c(null,length(intersect(t1,t2)))
 }
 options(scipen = -999999)
-n.test.twoTails(null,obs,1e-5)
+n.test.oneTails(null,obs,1e-5)
 hist(null,xlim=c(min(null)-350,max(null)+350))
 abline(v=obs,col="red",lwd=2)
 s1<-sub_dgenes$aba;lens1<-length(s1)
@@ -474,7 +460,7 @@ for(i in 1:1000){
 }
 hist(null,xlim=c(min(null)-350,max(null)+350));abline(v=obs,col="red",lwd=2)
 options(scipen = -999999)
-n.test.twoTails(null,obs,1e-5)
+n.test.oneTails(null,obs,1e-5)
 s1<-sub_dgenes$pk;lens1<-length(s1)
 s2<-sub_dgenes$aba;lens2<-length(s2)
 obs<-length(intersect(s1,s2))
@@ -486,7 +472,7 @@ for(i in 1:1000){
 }
 hist(null,xlim=c(min(null)-350,max(null)+350));abline(v=obs,col="red",lwd=2)
 options(scipen = -999999)
-n.test.twoTails(null,obs,1e-5)
+n.test.oneTails(null,obs,1e-5)
 s1<-topEnrichments$pk$path_id;lens1<-length(s1)
 s2<-topEnrichments$aba$path_id;lens2<-length(s2)
 obs<-length(intersect(s1,s2))
@@ -497,7 +483,7 @@ for(i in 1:1000){
   null<-c(null,length(intersect(t1,t2)))
 }
 options(scipen = -999999)
-n.test.twoTails(null,obs,1e-5)
+n.test.oneTails(null,obs,1e-5)
 hist(null,xlim=c(min(null)-350,max(null)+350))
 abline(v=obs,col="red",lwd=2)
 s1<-topEnrichments$aba$path_id;lens1<-length(s1)
@@ -510,7 +496,7 @@ for(i in 1:1000){
   null<-c(null,length(intersect(t1,t2)))
 }
 options(scipen = -999999)
-n.test.twoTails(null,obs,1e-5)
+n.test.oneTails(null,obs,1e-5)
 hist(null,xlim=c(min(null)-350,max(null)+350))
 abline(v=obs,col="red",lwd=2)
 
@@ -525,7 +511,7 @@ for(i in 1:1000){
   null<-c(null,length(intersect(t1,intersect(t2,t3))))
 }
 options(scipen = -999999)
-n.test.twoTails(null,obs,1e-5)
+n.test.oneTails(null,obs,1e-5)
 hist(null,xlim=c(min(null)-350,max(null)+350))
 abline(v=obs,col="red",lwd=2)
 
@@ -540,7 +526,7 @@ for(i in 1:1000){
   null<-c(null,length(intersect(t1,intersect(t2,t3))))
 }
 options(scipen = -999999)
-n.test.twoTails(null,obs,1e-5)
+n.test.oneTails(null,obs,1e-5)
 hist(null,xlim=c(min(null)-350,max(null)+350))
 abline(v=obs,col="red",lwd=2)
 
@@ -559,8 +545,8 @@ for(i in 1:1000){
 p<-c()
 z<-c()
 for(i in (obs-100):(obs+100)){
-  p<-c(p,n.test.twoTails(null,i,0.05)$p_value)
-  z<-c(z,n.test.twoTails(null,i,0.05)$z_score)
+  p<-c(p,n.test.oneTails(null,i,0.05)$p_value)
+  z<-c(z,n.test.oneTails(null,i,0.05)$z_score)
 }
 plot(p,pch=19)
 #####Top common enriched pathway in PK and SZ#####

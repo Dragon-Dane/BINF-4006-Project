@@ -11,9 +11,6 @@ library(gplots)
 setwd("~/Google\ Drive/BINF\ 4006\ Project\ ")
 #####source functions#####
 source("~/Google\ Drive/BINF\ 4006\ Project\ /Scripts/Functions.R")
-#####load data#####
-load("~/Google\ Drive/BINF\ 4006\ Project\ /RDa/Ontology.RDa")
-load("~/Google\ Drive/BINF\ 4006\ Project\ /RDa/ABAProcessing.RDa")
 #####pathway dictionary#####
 pathlist<-read.delim("~/Google\ Drive/BINF\ 4006\ Project\ /Ensembl2Reactome_All_Levels.txt",sep="\t",stringsAsFactors=F,header=F)
 reactome<-pathlist[which(pathlist[,ncol(pathlist)]=="Homo sapiens"),]
@@ -152,15 +149,24 @@ autoplot(pr,data=data,
   )
 dev.off()
 #####P2 PCA colored by enriched diffeq pathways#####
-pathwayOfInterestId<-as.character(topEnrichments$aba$path_id[1])
 sgMat<-strucMat(5,"CbCx_Cerebellar Cortex")
 spMat<-pathMat(5,"CbCx_Cerebellar Cortex")
-pdf(paste0(getwd(),"/Results/Proposal2_PCA_ABAData_CerebellarCortex_ColoredByTopEnrichedPathway.pdf"),width=6,height=5)
+pdf(paste0(getwd(),"/Results/Proposal2_PCA_ABAData_CerebellarCortex_ColoredBy1stEnrichedPathway.pdf"),width=6,height=5)
+pathwayOfInterestId<-as.character(topEnrichments$aba$path_id[1])
 varyingPathwayPCA(pathwayOfInterestId,sgMat,spMat)
 dev.off()
-#####brain structures of interest#####
+pdf(paste0(getwd(),"/Results/Proposal2_PCA_ABAData_CerebellarCortex_ColoredBy2ndEnrichedPathway.pdf"),width=6,height=5)
+pathwayOfInterestId<-as.character(topEnrichments$aba$path_id[2])
+varyingPathwayPCA(pathwayOfInterestId,sgMat,spMat)
+dev.off()
+pdf(paste0(getwd(),"/Results/Proposal2_PCA_ABAData_CerebellarCortex_ColoredBy3rdEnrichedPathway.pdf"),width=6,height=5)
+pathwayOfInterestId<-as.character(topEnrichments$aba$path_id[3])
+varyingPathwayPCA(pathwayOfInterestId,sgMat,spMat)
+dev.off()
+#####brain structures of interest and their significance#####
 load("~/Google Drive/BINF 4006 Project /RDa/DiffExpr.RDa")
 #P1
+#obs
 onts<-NULL
 name<-"alz"
 data<-path_struc_mat
@@ -174,10 +180,78 @@ for(i in 1:nrow(topEnrichments[[name]])){
   onts[[i]]<-as.data.frame(pheno[pathcol>cut,3:8])
 }
 strucsWVariablePath<-unlist(lapply(onts,function(x){as.character(x[,2])}))
-table<-table(strucsWVariablePath)/length(strucsWVariablePath)
-table[order(table,decreasing=F)]*100
-sum(table[order(table,decreasing=F)])
+alz_table<-table(strucsWVariablePath)/length(strucsWVariablePath)
+alz_table[order(alz_table,decreasing=F)]*100
+sum(alz_table[order(alz_table,decreasing=F)])
+#null distributions
+alz_names<-names(alz_table)
+name<-"alz"
+data<-path_struc_mat
+pheno<-ontology
+alz_null_table<-NULL
+for(i in 1:1000){
+  nullpaths<-sample(colnames(data),nrow(topEnrichments[[name]]))
+  onts<-NULL
+  for(j in 1:length(nullpaths)){
+    pathwayOfInterestId<-as.character(nullpaths[j]) 
+    pathid<-which(colnames(data) %in% pathwayOfInterestId)
+    pathcol<-data[,pathid]
+    cut<-quantile(pathcol)["75%"]
+    onts[[j]]<-as.data.frame(pheno[pathcol>cut,3:8])
+  }
+  strucsWVariablePath<-unlist(lapply(onts,function(x){as.character(x[,2])}))
+  alz_null_table[[i]]<-table(strucsWVariablePath)/length(strucsWVariablePath)
+}
+#from null table with random structures, get null distribution for null structures
+alz_null_struc_freq<-NULL
+for(i in 1:length(alz_names)){
+  null<-c()
+  for(j in 1:length(alz_null_table)){
+    null<-c(null,alz_null_table[[j]][names(alz_null_table[[j]]) %in% alz_names[i]])
+  }
+  alz_null_struc_freq[[i]]<-null
+}
+names(alz_null_struc_freq)<-alz_names
+#compare observed structure proportion with null structure proportion
+alz_sig_test_list<-NULL
+for(i in 1:length(alz_names)){
+  struc<-alz_names[i]
+  obs<-alz_table[names(alz_table) %in% struc]
+  null_distr<-alz_null_struc_freq[[ i ]]
+  alz_sig_test_list[[i]]<-n.test.oneTails(null_distr,obs,0.05)
+}
+names(alz_sig_test_list)<-alz_names
+#plot significance of structures
+plot(-log10(unlist(lapply(alz_sig_test_list,function(x){x$p_value}))),ylab="p-values",xlab="structures harboring variability in dz EPs")
+abline(h= -log10(0.05),col="red",lwd=2)
+#which structure is most significant and what's the frequency of harboring variable pathways?
+ind<-which.min(unlist(lapply(alz_sig_test_list,function(x){x$p_value})))
+ord_ps<-order(p.adjust(unlist(lapply(alz_sig_test_list,function(x){x$p_value})),method="BH"),decreasing=T)
+adj_ps<-p.adjust(unlist(lapply(alz_sig_test_list,function(x){x$p_value})),method="BH")
+ord_zs<-order(unlist(lapply(alz_sig_test_list,function(x){x$z_score})),decreasing=T)
+alz_sig_test_list[[ind]]
+cbind("Z"=lapply(alz_sig_test_list[ord_ps],function(x){x$z_score}),"p-value"=p.adjust(lapply(alz_sig_test_list[ord_ps],function(x){x$p_value}),method="BH"))
+cbind("Z"=lapply(alz_sig_test_list[ord_zs],function(x){x$z_score}),"p-value"=adj_ps[ord_zs])
+#
+#
 #P2
+onts<-NULL
+name<-"pk"
+data<-pathMat(5,"CbCx_Cerebellar Cortex")
+pheno<-ontology[which(ontology$Structure.Hierarchy.Tier.5=="CbCx_Cerebellar Cortex"),]
+for(i in 1:nrow(topEnrichments[[name]])){
+  pathwayOfInterestId<-as.character(topEnrichments[[name]]$path_id[i]) #top enriched pathway in alzheimers
+  pathid<-which(colnames(data) %in% pathwayOfInterestId)
+  pathcol<-data[,pathid]
+  #ind<-order(pathcol,decreasing=T)
+  cut<-quantile(pathcol)["75%"]
+  onts[[i]]<-as.data.frame(pheno[pathcol>cut,3:8])
+}
+strucsWVariablePath<-unlist(lapply(onts,function(x){as.character(x[,6])}))
+pk_table<-table(strucsWVariablePath)/length(strucsWVariablePath)
+pk_table[order(pk_table,decreasing=F)]*100
+sum(pk_table[order(pk_table,decreasing=F)])
+
 onts<-NULL
 name<-"sz"
 data<-pathMat(5,"CbCx_Cerebellar Cortex")
@@ -191,12 +265,113 @@ for(i in 1:nrow(topEnrichments[[name]])){
   onts[[i]]<-as.data.frame(pheno[pathcol>cut,3:8])
 }
 strucsWVariablePath<-unlist(lapply(onts,function(x){as.character(x[,6])}))
-table<-table(strucsWVariablePath)/length(strucsWVariablePath)
-table[order(table,decreasing=F)]*100
-sum(table[order(table,decreasing=F)])
+sz_table<-table(strucsWVariablePath)/length(strucsWVariablePath)
+sz_table[order(sz_table,decreasing=F)]*100
+sum(sz_table[order(sz_table,decreasing=F)])
+#
+#null distributions
+#make null table
+pk_names<-names(pk_table)
+name<-"pk"
+data<-pathMat(5,"CbCx_Cerebellar Cortex")
+pheno<-ontology[which(ontology$Structure.Hierarchy.Tier.5=="CbCx_Cerebellar Cortex"),]
+pk_null_table<-NULL
+for(i in 1:1000){
+  nullpaths<-sample(colnames(data),nrow(topEnrichments[[name]]))
+  onts<-NULL
+  for(j in 1:length(nullpaths)){
+    pathwayOfInterestId<-as.character(nullpaths[j]) 
+    pathid<-which(colnames(data) %in% pathwayOfInterestId)
+    pathcol<-data[,pathid]
+    cut<-quantile(pathcol)["75%"]
+    onts[[j]]<-as.data.frame(pheno[pathcol>cut,3:8])
+  }
+  strucsWVariablePath<-unlist(lapply(onts,function(x){as.character(x[,6])}))
+  pk_null_table[[i]]<-table(strucsWVariablePath)/length(strucsWVariablePath)
+}
+#from null table with random structures, get null distribution for null structures
+pk_null_struc_freq<-NULL
+for(i in 1:length(pk_names)){
+  null<-c()
+  for(j in 1:length(pk_null_table)){
+    null<-c(null,pk_null_table[[j]][names(pk_null_table[[j]]) %in% pk_names[i]])
+  }
+  pk_null_struc_freq[[i]]<-null
+}
+names(pk_null_struc_freq)<-pk_names
+#compare observed structure proportion with null structure proportion
+pk_sig_test_list<-NULL
+for(i in 1:length(pk_names)){
+  struc<-pk_names[i]
+  obs<-pk_table[names(pk_table) %in% struc]
+  null_distr<-pk_null_struc_freq[[ which(names(pk_null_struc_freq) %in% struc) ]]
+  pk_sig_test_list[[i]]<-n.test.oneTails(null_distr,obs,0.05)
+}
+names(pk_sig_test_list)<-pk_names
+#plot significance of structures
+plot(-log10(unlist(lapply(pk_sig_test_list,function(x){x$p_value}))),ylab="p-values",xlab="structures harboring variability in dz EPs")
+abline(h= -log10(0.05),col="red",lwd=2)
+#which structure is most significant and what's the frequency of harboring variable pathways?
+ind<-which.min(unlist(lapply(pk_sig_test_list,function(x){x$p_value})))
+ord_ps<-order(p.adjust(unlist(lapply(pk_sig_test_list,function(x){x$p_value})),method="BH"),decreasing=T)
+adj_ps<-p.adjust(unlist(lapply(pk_sig_test_list,function(x){x$p_value})),method="BH")
+ord_zs<-order(unlist(lapply(pk_sig_test_list,function(x){x$z_score})),decreasing=T)
+pk_sig_test_list[[ind]]
+cbind("Z"=lapply(pk_sig_test_list[ord_ps],function(x){x$z_score}),"p-value"=p.adjust(lapply(pk_sig_test_list[ord_ps],function(x){x$p_value}),method="BH"))
+cbind("Z"=lapply(pk_sig_test_list[ord_zs],function(x){x$z_score}),"p-value"=adj_ps[ord_zs])
+#
+#
+sz_names<-names(sz_table)
+name<-"sz"
+data<-pathMat(5,"CbCx_Cerebellar Cortex")
+pheno<-ontology[which(ontology$Structure.Hierarchy.Tier.5=="CbCx_Cerebellar Cortex"),]
+sz_null_table<-NULL
+for(i in 1:1000){
+  nullpaths<-sample(colnames(data),nrow(topEnrichments[[name]]))
+  onts<-NULL
+  for(j in 1:length(nullpaths)){
+    pathwayOfInterestId<-as.character(nullpaths[j]) 
+    pathid<-which(colnames(data) %in% pathwayOfInterestId)
+    pathcol<-data[,pathid]
+    cut<-quantile(pathcol)["75%"]
+    onts[[j]]<-as.data.frame(pheno[pathcol>cut,3:8])
+  }
+  strucsWVariablePath<-unlist(lapply(onts,function(x){as.character(x[,6])}))
+  sz_null_table[[i]]<-table(strucsWVariablePath)/length(strucsWVariablePath)
+}
+#from null table with random structures, get null distribution for null structures
+sz_null_struc_freq<-NULL
+for(i in 1:length(sz_names)){
+  null<-c()
+  for(j in 1:length(sz_null_table)){
+    null<-c(null,sz_null_table[[j]][names(sz_null_table[[j]]) %in% sz_names[i]])
+  }
+  sz_null_struc_freq[[i]]<-null
+}
+names(sz_null_struc_freq)<-sz_names
+#compare observed structure proportion with null structure proportion
+sz_sig_test_list<-NULL
+for(i in 1:length(sz_names)){
+  struc<-sz_names[i]
+  obs<-sz_table[names(sz_table) %in% struc]
+  null_distr<-sz_null_struc_freq[[ which(names(sz_null_struc_freq) %in% struc) ]]
+  sz_sig_test_list[[i]]<-n.test.oneTails(null_distr,obs,0.05)
+}
+names(sz_sig_test_list)<-sz_names
+#plot significance of structures
+plot(-log10(unlist(lapply(sz_sig_test_list,function(x){x$p_value}))),ylab="p-values",xlab="structures harboring variability in dz EPs")
+abline(h= -log10(0.05),col="red",lwd=2)
+#which structure is most significant and what's the frequency of harboring variable pathways?
+ind<-which.min(unlist(lapply(sz_sig_test_list,function(x){x$p_value})))
+ord_ps<-order(p.adjust(unlist(lapply(sz_sig_test_list,function(x){x$p_value})),method="BH"),decreasing=T)
+adj_ps<-p.adjust(unlist(lapply(sz_sig_test_list,function(x){x$p_value})),method="BH")
+ord_zs<-order(unlist(lapply(sz_sig_test_list,function(x){x$z_score})),decreasing=T)
+sz_sig_test_list[[ind]]
+cbind("Z"=lapply(sz_sig_test_list[ord_ps],function(x){x$z_score}),"p-value"=p.adjust(lapply(sz_sig_test_list[ord_ps],function(x){x$p_value}),method="BH"))
+cbind("Z"=lapply(sz_sig_test_list[ord_zs],function(x){x$z_score}),"p-value"=adj_ps[ord_zs])
 #####trying out GSEABase#####
 source("https://bioconductor.org/biocLite.R")
 biocLite("GSEABase")
 library(GSEABase)
 #####save image#####
-save.image("~/Google\ Drive/BINF\ 4006\ Project\ /RDa/Enrichment.RDa")
+save.image("~/Documents/Columbia/Courses/TRANSLATIONAL_BIOINFORMATICS/project/RDa/Enrichment.RDa")
