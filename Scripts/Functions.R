@@ -1,9 +1,9 @@
 #PURPOSE: To store functions related to BINF Project.
 
 ##########data to be loaded for functions
-load("~/Google\ Drive/BINF\ 4006\ Project\ /RDa/Ontology.RDa")
-load("~/Google\ Drive/BINF\ 4006\ Project\ /RDa/ABAProcessing.RDa")
-load("~/Google\ Drive/BINF\ 4006\ Project\ /RDa/Enrichment.RDa")
+load("~/Documents/Columbia/Courses/TRANSLATIONAL_BIOINFORMATICS/project/RDa/Ontology.RDa")
+load("~/Documents/Columbia/Courses/TRANSLATIONAL_BIOINFORMATICS/project/RDa/ABAProcessing.RDa")
+load("~/Documents/Columbia/Courses/TRANSLATIONAL_BIOINFORMATICS/project/RDa/Enrichment.RDa")
 ####################
 makeDictionary<-function(file=file,keys,values){
 #'file' is a data frame (generated from loading a file into R typically)
@@ -151,4 +151,22 @@ pathMat<-function(tier,key){
   path_struc_mat[inds,]
 }
 ####################
+n.test.oneTails <- function(data, mu0, alpha){
+  z<-(mean(data)-mu0)/sd(data)
+  n.critical <- qnorm(1-alpha/2) #Es alpha 0.05 -> -1.9599 (df=Inf)
+  if(z > -n.critical){
+    p.value<-1-pnorm(z)
+  }
+  else{
+    p.value<-pnorm(z)
+  }
+  if(abs(z) >= n.critical){
+    h<-"Reject"
+  }
+  else{
+    h<-"Accept"
+  }
+  list("H0"=h,"n_critical_values"=c(-n.critical,n.critical),
+       "z_score"=z,"p_value"=p.value)
+}
 
