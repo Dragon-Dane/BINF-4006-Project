@@ -1,6 +1,6 @@
 # BINF-4006-Project
 
-![](https://pxhere.com/en/photo/1584997)
+![](https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSsstOIF0phPzThEVXS0305rsANFZDbnHQmQS3G-cMKgh9pDTsc)
 
 
 Fall 2016 Translational bioinformatics project code, data images, and other select documents
